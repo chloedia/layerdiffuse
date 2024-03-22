@@ -1,30 +1,37 @@
 import torch
 
-from refiners.fluxion.utils import load_from_safetensors, manual_seed, no_grad
+from refiners.fluxion.utils import load_from_safetensors, manual_seed, no_grad, save_to_safetensors
 from refiners.foundationals.latent_diffusion.lora import SDLoraManager
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl import (
     StableDiffusion_XL,
 )
 
 from layerdiffuse.models.models import UNet1024Refiners
+from utils.utils import transform_keys
 
 from PIL import Image
 
 # Load SDXL
-sdxl = StableDiffusion_XL(device="cuda", dtype=torch.float16)
-sdxl.clip_text_encoder.load_from_safetensors("sdxl-weights/text_encoder.safetensors")
-sdxl.unet.load_from_safetensors("sdxl-weights/unet.safetensors")
-sdxl.lda.load_from_safetensors("sdxl-weights/lda.safetensors")
+# sdxl = StableDiffusion_XL(device="cpu", dtype=torch.float16)
+# sdxl.clip_text_encoder.load_from_safetensors("sdxl-weights/text_encoder.safetensors")
+# sdxl.unet.load_from_safetensors("sdxl-weights/unet.safetensors")
+# sdxl.lda.load_from_safetensors("sdxl-weights/lda.safetensors")
 
 # Load LoRA weights from disk and inject them into target
-manager = SDLoraManager(sdxl)
-ld_lora_weights = load_from_safetensors("layer_xl_transparent_attn.safetensors")
-manager.add_loras("ld-lora", tensors=ld_lora_weights)
+# manager = SDLoraManager(sdxl)
+ld_lora_weights = transform_keys(
+    load_from_safetensors("layer_xl_transparent_attn.safetensors")
+)
+save_to_safetensors("layer_xl_transparent_attn_refined.safetensors", ld_lora_weights)
 
+sci_fi_lora_weights = load_from_safetensors("sci-fi-lora.safetensors")
+# manager.add_loras("ld-lora", tensors=ld_lora_weights)
 
+print("ok")
 # Load Layer diffuse decoder
 ld_decoder = UNet1024Refiners()
 ld_decoder.load_from_safetensors("vae_transparent_decoder.safetensors")
+
 
 # Hyperparameters
 prompt = "a futuristic magical panda with a purple glow, cyberpunk"
