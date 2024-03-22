@@ -7,6 +7,8 @@ authors = [
 ]
 dependencies = [
     "refiners>=0.4.0",
+    "opencv-python>=4.9.0.80",
+    "diffusers>=0.27.2",
 ]
 readme = "README.md"
 requires-python = ">= 3.8"
@@ -17,7 +19,9 @@ build-backend = "hatchling.build"
 
 [tool.rye]
 managed = true
-dev-dependencies = []
+dev-dependencies = [
+    "refiners[conversion] @ git+https://github.com/finegrain-ai/refiners.git",
+]
 
 [tool.hatch.metadata]
 allow-direct-references = true

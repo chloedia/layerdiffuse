@@ -3,7 +3,7 @@ from torch import Tensor, device as Device, dtype as DType
 import refiners.fluxion.layers as fl
 from refiners.fluxion.context import Contexts
 from refiners.fluxion.layers import SelfAttention2d
-from refiners.foundationals.latent_diffusion.auto_encoder import Resnet
+#from refiners.foundationals.latent_diffusion.auto_encoder import Resnet
 
 
 def zero_module(module: fl.Module):
@@ -41,7 +41,47 @@ class LatentTransparencyOffsetEncoderRefiners(fl.Chain):
             fl.Conv2d(256, 4, kernel_size=3, padding=1, stride=1),
         )
 
-
+class Resnet(fl.Sum):
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        num_groups: int = 32,
+        device: Device | str | None = None,
+        dtype: DType | None = None,
+    ):
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        shortcut = (
+            fl.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1, device=device, dtype=dtype)
+            if in_channels != out_channels
+            else fl.Identity()
+        )
+        super().__init__(
+            fl.Chain(
+                fl.GroupNorm(channels=in_channels, num_groups=num_groups, device=device, dtype=dtype),
+                fl.SiLU(),
+                fl.Conv2d(
+                    in_channels=in_channels,
+                    out_channels=out_channels,
+                    kernel_size=3,
+                    padding=1,
+                    device=device,
+                    dtype=dtype,
+                ),
+                fl.GroupNorm(channels=out_channels, num_groups=num_groups, device=device, dtype=dtype),
+                fl.SiLU(),
+                fl.Conv2d(
+                    in_channels=out_channels,
+                    out_channels=out_channels,
+                    kernel_size=3,
+                    padding=1,
+                    device=device,
+                    dtype=dtype,
+                ),
+            ),
+            shortcut,
+        )
 class DownBlock2D(fl.Chain):
     def __init__(
         self,

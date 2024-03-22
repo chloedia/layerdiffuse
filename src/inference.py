@@ -12,9 +12,9 @@ from PIL import Image
 
 # Load SDXL
 sdxl = StableDiffusion_XL(device="cuda", dtype=torch.float16)
-sdxl.clip_text_encoder.load_from_safetensors("DoubleCLIPTextEncoder.safetensors")
-sdxl.unet.load_from_safetensors("sdxl-unet.safetensors")
-sdxl.lda.load_from_safetensors("sdxl-lda.safetensors")
+sdxl.clip_text_encoder.load_from_safetensors("sdxl-weights/text_encoder.safetensors")
+sdxl.unet.load_from_safetensors("sdxl-weights/unet.safetensors")
+sdxl.lda.load_from_safetensors("sdxl-weights/lda.safetensors")
 
 # Load LoRA weights from disk and inject them into target
 manager = SDLoraManager(sdxl)
@@ -44,7 +44,7 @@ with no_grad():
     manual_seed(seed=seed)
 
     # SDXL typically generates 1024x1024, here we use a higher resolution.
-    x = sdxl.init_latents((2048, 2048)).to(sdxl.device, sdxl.dtype)
+    x = sdxl.init_latents((1024, 1024)).to(sdxl.device, sdxl.dtype)
     ld_decoder.set_context("unet1024", {"latent": x})
 
     # Diffusion process
@@ -62,5 +62,5 @@ with no_grad():
 
     transparent_image = ld_decoder(predicted_image)
 
-    predicted_image.save("origin_sdxl.png")
-    Image.fromarray(transparent_image).save("transparent_sdxl.png")
+    predicted_image.save("outputs/origin_sdxl.png")
+    Image.fromarray(transparent_image).save("outputs/transparent_sdxl.png")
