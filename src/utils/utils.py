@@ -30,26 +30,19 @@ def load_torch_file(ckpt, safe_load=False, device=None) -> dict:  # type: ignore
     return sd  # type: ignore
 
 
-def transform_keys(input_dict: Dict[str, Any]) -> Dict[str, Any]:
-    transformed_dict: Dict[str, Any] = {}
-    for key, value in input_dict.items():
-        # Extract the components of the key using regex
-        match = re.match(
-            r"(.*?)\.(\d+)\.(\d+)\.(\w+)\.(\d+)\.(\w+)\.(\w+)\.(\w+)::lora::(\d+)", key
-        )
-        if match:
-            # Construct the new key format
-            new_key = (
-                f"lora_{match.group(1).replace('_', '')}_{match.group(2)}_{match.group(3)}_"
-                f"{match.group(4)}s_{match.group(5)}_{match.group(6)}_{match.group(7)}"
-            )
-            if match.group(9) == "0":
-                new_key += ".lora_up.weight"
-            else:
-                new_key += ".lora_down.weight"
-            if new_key.endswith("proj_in.lora_up.weight"):
-                new_key = new_key.replace("proj_in.lora_up.weight", "proj_in.alpha")
-            elif new_key.endswith("proj_out.lora_up.weight"):
-                new_key = new_key.replace("proj_out.lora_up.weight", "proj_out.alpha")
-            transformed_dict[new_key] = value
-    return transformed_dict
+def modify_dict(input_dict: Dict[str, Any]) -> Dict[str, Any]:
+    modified_dict = {}
+    matrix_down = None
+    for key in input_dict:
+        base_key = key.split("::lora::")[0]
+        if "::lora::0" in key:
+            matrix_down = input_dict[key]
+        elif "::lora::1" in key:
+            lora_0_key = base_key + "::lora::0"
+            lora_1_key = base_key + "::lora::1"
+            modified_dict[lora_0_key] = input_dict[key]
+            modified_dict[lora_1_key] = matrix_down
+            matrix_down = None
+        else:
+            modified_dict[key] = input_dict[key]
+    return modified_dict
