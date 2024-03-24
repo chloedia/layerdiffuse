@@ -1,7 +1,8 @@
 import torch
 import safetensors
-import re
 from typing import Dict, Any
+
+import numpy as np
 
 
 def load_torch_file(ckpt, safe_load=False, device=None) -> dict:  # type: ignore
@@ -45,4 +46,7 @@ def modify_dict(input_dict: Dict[str, Any]) -> Dict[str, Any]:
             matrix_down = None
         else:
             modified_dict[key] = input_dict[key]
-    return modified_dict
+    return modified_dict #type: ignore
+
+def checkerboard(shape: tuple[int, int]) -> np.ndarray: #type: ignore
+   return np.indices(shape).sum(axis=0) % 2

@@ -1,10 +1,13 @@
-from torch import Tensor, device as Device, dtype as DType
-
+from torch import Tensor, float16, flip, from_numpy, rot90, stack, median, device as Device, dtype as DType #type: ignore
+from tqdm import tqdm
 import refiners.fluxion.layers as fl
 from refiners.fluxion.context import Contexts
 from refiners.fluxion.layers import SelfAttention2d
 #from refiners.foundationals.latent_diffusion.auto_encoder import Resnet
+from utils.utils import checkerboard #type: ignore
 
+
+import cv2
 
 def zero_module(module: fl.Module):
     """
@@ -48,7 +51,7 @@ class Resnet(fl.Sum):
         out_channels: int,
         num_groups: int = 32,
         device: Device | str | None = None,
-        dtype: DType | None = None,
+        dtype: DType | None = None ,
     ):
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -411,7 +414,7 @@ class MiddleBlock(fl.Chain):
 
 # 1024 * 1024 * 3 -> 16 * 16 * 512 -> 1024 * 1024 * 3
 class UNet1024Refiners(fl.Chain):
-    def __init__(self, out_channels: int = 3, device: Device | str | None = None, dtype: DType | None = None) -> None:
+    def __init__(self, out_channels: int = 3, device: Device | str | None = "cuda", dtype: DType | None = None) -> None:
         self.out_channels = out_channels
         super().__init__(
             fl.Passthrough(
@@ -462,3 +465,56 @@ class UNet1024Refiners(fl.Chain):
             "unet1024": {"residuals": []},
             "sampling": {"shapes": []},
         }
+
+
+class TransparentVAEDecoder:
+    def __init__(self, state_dict: str):
+        self.model = UNet1024Refiners(out_channels=4)
+        self.model.load_from_safetensors(state_dict)
+        self.model.to("cuda", float16)
+    
+    def postprocess(self, y: Tensor):
+        y = y.clip(0, 1).movedim(1, -1)
+        alpha = y[..., :1]
+        fg = y[..., 1:]
+
+        _, H, W, _ = fg.shape
+        cb = checkerboard(shape=(H // 64, W // 64)) #type: ignore
+        cb = cv2.resize(cb, (W, H), interpolation=cv2.INTER_NEAREST) #type: ignore
+        cb = (0.5 + (cb - 0.5) * 0.1)[None, ..., None]#type: ignore
+        cb = from_numpy(cb).to(fg) #type: ignore
+
+        vis = fg * alpha + cb * (1 - alpha)
+
+        return vis.movedim(-1,1)
+
+    def run(self, pixel: Tensor, latent: Tensor) -> Tensor:
+        args = [
+            [False, 0], [False, 1], [False, 2], [False, 3], [True, 0], [True, 1], [True, 2], [True, 3],
+        ]
+
+        result: list[Tensor] = []
+
+        for doflip, rok in tqdm(args):
+            feed_pixel = pixel.clone()
+            feed_latent = latent.clone()
+
+            if doflip:
+                feed_pixel = flip(feed_pixel, dims=(3,))
+                feed_latent = flip(feed_latent, dims=(3,))
+
+            feed_pixel = rot90(feed_pixel, k=rok, dims=(2, 3))
+            feed_latent = rot90(feed_latent, k=rok, dims=(2, 3))
+
+            self.model.set_context("unet1024", {"latent": feed_latent})
+            eps = self.model(feed_pixel).clip(0,1)
+            eps = rot90(eps, k=-rok, dims=(2, 3))
+            if doflip:
+                eps = flip(eps, dims=(3,))
+
+            result += [eps]
+
+        stacked_result = stack(result, dim=0)
+        _median = median(stacked_result, dim=0).values
+        return self.postprocess(_median)
+

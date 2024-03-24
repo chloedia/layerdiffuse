@@ -1,40 +1,45 @@
 import torch
 
-from refiners.fluxion.utils import load_from_safetensors, manual_seed, no_grad, save_to_safetensors
+from refiners.fluxion.utils import load_from_safetensors, manual_seed, no_grad, images_to_tensor, tensor_to_image
 from refiners.foundationals.latent_diffusion.lora import SDLoraManager
 from refiners.foundationals.latent_diffusion.stable_diffusion_xl import (
     StableDiffusion_XL,
 )
 
-from layerdiffuse.models.models import UNet1024Refiners
-from utils.utils import transform_keys
+from layerdiffuse.models.models import UNet1024Refiners, TransparentVAEDecoder
+from utils.utils import modify_dict
 
 from PIL import Image
 
-# Load SDXL
-# sdxl = StableDiffusion_XL(device="cpu", dtype=torch.float16)
-# sdxl.clip_text_encoder.load_from_safetensors("sdxl-weights/text_encoder.safetensors")
-# sdxl.unet.load_from_safetensors("sdxl-weights/unet.safetensors")
-# sdxl.lda.load_from_safetensors("sdxl-weights/lda.safetensors")
+torch.autocast("cuda", torch.float16).__enter__()
+#Load SDXL
+sdxl = StableDiffusion_XL(device="cuda", dtype=torch.float16)
+sdxl.clip_text_encoder.load_from_safetensors("sdxl-weights/text_encoder.safetensors")
+sdxl.unet.load_from_safetensors("sdxl-weights/unet.safetensors")
+sdxl.lda.load_from_safetensors("sdxl-weights/lda.safetensors")
 
-# Load LoRA weights from disk and inject them into target
-# manager = SDLoraManager(sdxl)
-ld_lora_weights = transform_keys(
-    load_from_safetensors("layer_xl_transparent_attn.safetensors")
-)
-save_to_safetensors("layer_xl_transparent_attn_refined.safetensors", ld_lora_weights)
+#Load LoRA weights from disk and inject them into target
+manager = SDLoraManager(sdxl)
 
-sci_fi_lora_weights = load_from_safetensors("sci-fi-lora.safetensors")
-# manager.add_loras("ld-lora", tensors=ld_lora_weights)
+ld_lora_weights = load_from_safetensors("layer_xl_transparent_attn.safetensors")
+ld_lora_weights_modified = modify_dict(ld_lora_weights)
 
-print("ok")
+#sci_fi_lora_weights = load_from_safetensors("sci-fi-lora.safetensors")
+try:
+    manager.add_loras("ld-lora", tensors=ld_lora_weights_modified, unet_inclusions= ["Attention", "SelfAttention"])
+except:
+    pass
 # Load Layer diffuse decoder
-ld_decoder = UNet1024Refiners()
-ld_decoder.load_from_safetensors("vae_transparent_decoder.safetensors")
+# ld_decoder = UNet1024Refiners(out_channels=4)
+# ld_decoder.load_from_safetensors("vae_transparent_decoder.safetensors")
+# ld_decoder = ld_decoder.to("cuda", torch.float16)
+
+ld_decoder = TransparentVAEDecoder("vae_transparent_decoder.safetensors")
 
 
 # Hyperparameters
-prompt = "a futuristic magical panda with a purple glow, cyberpunk"
+#prompt = "a futuristic magical panda with a purple glow, cyberpunk"
+prompt = "a unique realistic red apple"
 seed = 42
 sdxl.set_inference_steps(50, first_step=0)
 sdxl.set_self_attention_guidance(
@@ -50,9 +55,9 @@ with no_grad():
 
     manual_seed(seed=seed)
 
-    # SDXL typically generates 1024x1024, here we use a higher resolution.
+    
     x = sdxl.init_latents((1024, 1024)).to(sdxl.device, sdxl.dtype)
-    ld_decoder.set_context("unet1024", {"latent": x})
+    #ld_decoder.set_context("unet1024", {"latent": x})
 
     # Diffusion process
     for step in sdxl.steps:
@@ -65,9 +70,24 @@ with no_grad():
             pooled_text_embedding=pooled_text_embedding,
             time_ids=time_ids,
         )
-    predicted_image = sdxl.lda.decode_latents(x)
+    latent = x
+    pixel = sdxl.lda.decode_latents(x)
+    pixel.save("outputs/origin_sdxl.png")
 
-    transparent_image = ld_decoder(predicted_image)
+    pixel = images_to_tensor([pixel], dtype = torch.float16, device= "cuda")
+    #transparent_image = ld_decoder(predicted_tensor)
+    transparent_image = ld_decoder.run(pixel, latent)
+    tensor_to_image(transparent_image).save("outputs/transparent_sdxl.png")
 
-    predicted_image.save("outputs/origin_sdxl.png")
-    Image.fromarray(transparent_image).save("outputs/transparent_sdxl.png")
+    pixel = Image.open("pixels.png")
+    latent = Image.open("latent.png")
+
+    pixel = images_to_tensor([pixel], dtype = torch.float16, device= "cuda")
+    latent = images_to_tensor([latent], dtype = torch.float16, device= "cuda")
+
+    #transparent_image = ld_decoder(images_to_tensor([image_prompt], dtype = torch.float16, device= "cuda"))
+    transparent_image = ld_decoder.run(pixel, latent)
+    tensor_to_image(transparent_image.detach()).save("outputs/transparent_sdxl_from_image.png")
+
+
+
