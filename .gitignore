@@ -1,3 +1,5 @@
 src/layerdiffuse/models/test.py
 *.safetensors
 /refiners
+src/convertor/test.py
+outputs/

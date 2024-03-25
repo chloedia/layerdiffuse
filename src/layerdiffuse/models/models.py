@@ -1,10 +1,12 @@
-from torch import Tensor, float16, flip, from_numpy, rot90, stack, median, device as Device, dtype as DType #type: ignore
+from typing import Any
+from torch import Tensor, float16, cat, flip, from_numpy, rot90, stack, median, device as Device, dtype as DType #type: ignore
 from tqdm import tqdm
 import refiners.fluxion.layers as fl
 from refiners.fluxion.context import Contexts
 from refiners.fluxion.layers import SelfAttention2d
 #from refiners.foundationals.latent_diffusion.auto_encoder import Resnet
 from utils.utils import checkerboard #type: ignore
+import numpy as np
 
 
 import cv2
@@ -473,7 +475,7 @@ class TransparentVAEDecoder:
         self.model.load_from_safetensors(state_dict)
         self.model.to("cuda", float16)
     
-    def postprocess(self, y: Tensor):
+    def postprocess(self, y: Tensor) -> tuple[Tensor, Any]:
         y = y.clip(0, 1).movedim(1, -1)
         alpha = y[..., :1]
         fg = y[..., 1:]
@@ -486,9 +488,12 @@ class TransparentVAEDecoder:
 
         vis = fg * alpha + cb * (1 - alpha)
 
-        return vis.movedim(-1,1)
+        png = cat([fg, alpha], dim=3)[0]
+        png = (png * 255.0).detach().cpu().float().numpy().clip(0, 255).astype(np.uint8)
 
-    def run(self, pixel: Tensor, latent: Tensor) -> Tensor:
+        return vis.movedim(-1,1), png
+
+    def run(self, pixel: Tensor, latent: Tensor) -> tuple[Tensor, Any]:
         args = [
             [False, 0], [False, 1], [False, 2], [False, 3], [True, 0], [True, 1], [True, 2], [True, 3],
         ]
