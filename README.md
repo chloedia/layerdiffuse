@@ -1,7 +1,7 @@
 # Layer Diffuse Refiners
 Transparent Image Layer Diffusion using Latent Transparency for [refiners](https://github.com/finegrain-ai/refiners/tree/main).
 
-![panda generation](./assets/architecture.png)
+![panda generation](./assets/archi.png)
 
 **Note:** This repo only implements layer diffusion for foreground generation base on the [Transparent Image Layer Diffusion using Latent Transparency](https://arxiv.org/abs/2402.17113v3) paper. Click [here](https://github.com/layerdiffusion/sd-forge-layerdiffuse) for the official implementation.
 
@@ -33,7 +33,7 @@ Go check into the refiners [docs](https://refine.rs/guides/adapting_sdxl/#multip
 ## Example of outputs
 
 ![panda generation](./assets/panda.png)
-![glass generation](./assets/to/glass.png)
+![glass generation](./assets/glass.png)
 
 Don't hesitate to contribute! 🔆
 
