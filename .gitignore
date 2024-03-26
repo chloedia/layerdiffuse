@@ -1,5 +1,8 @@
 outputs/
 
+# lock files
+*.lock
+
 # weights
 *.safetensors
 
