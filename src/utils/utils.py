@@ -30,23 +30,25 @@ def load_torch_file(ckpt, safe_load=False, device=None) -> dict:  # type: ignore
             sd = pl_sd
     return sd  # type: ignore
 
-def checkerboard(shape: tuple[int, int]) -> np.ndarray: #type: ignore
-   return np.indices(shape).sum(axis=0) % 2
 
-def load_frozen_patcher(state_dict:  Dict[str, Any]) ->  Dict[str, Any]:
-        patch_dict:  Dict[str, Any] = {}
-        for k, w in state_dict.items():
-            model_key, patch_type, weight_index = k.split('::')
-            if model_key not in patch_dict:
-                patch_dict[model_key] = {}
-            if patch_type not in patch_dict[model_key]:
-                patch_dict[model_key][patch_type] = [None] * 16
-            patch_dict[model_key][patch_type][int(weight_index)] = w
+def checkerboard(shape: tuple[int, int]) -> np.ndarray:  # type: ignore
+    return np.indices(shape).sum(axis=0) % 2
 
-        patch_flat:  Dict[str, Any] = {}
-        for model_key, v in patch_dict.items():
-            for patch_type, weight_list in v.items():
-                patch_flat[f'{model_key[:-7]}.up.weight'] = weight_list[1]
-                patch_flat[f'{model_key[:-7]}.down.weight'] = weight_list[0]
 
-        return patch_flat
+def load_frozen_patcher(state_dict: Dict[str, Any]) -> Dict[str, Any]:
+    patch_dict: Dict[str, Any] = {}
+    for k, w in state_dict.items():
+        model_key, patch_type, weight_index = k.split("::")
+        if model_key not in patch_dict:
+            patch_dict[model_key] = {}
+        if patch_type not in patch_dict[model_key]:
+            patch_dict[model_key][patch_type] = [None] * 16
+        patch_dict[model_key][patch_type][int(weight_index)] = w
+
+    patch_flat: Dict[str, Any] = {}
+    for model_key, v in patch_dict.items():
+        for patch_type, weight_list in v.items():
+            patch_flat[f"{model_key[:-7]}.up.weight"] = weight_list[1]
+            patch_flat[f"{model_key[:-7]}.down.weight"] = weight_list[0]
+
+    return patch_flat

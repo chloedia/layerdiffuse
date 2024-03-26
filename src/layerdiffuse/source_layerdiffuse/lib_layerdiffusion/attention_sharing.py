@@ -8,7 +8,40 @@ from ldm_patched.modules import utils
 from ldm_patched.ldm.modules.attention import optimized_attention
 
 
-module_mapping_sd15 = {0: 'input_blocks.1.1.transformer_blocks.0.attn1', 1: 'input_blocks.1.1.transformer_blocks.0.attn2', 2: 'input_blocks.2.1.transformer_blocks.0.attn1', 3: 'input_blocks.2.1.transformer_blocks.0.attn2', 4: 'input_blocks.4.1.transformer_blocks.0.attn1', 5: 'input_blocks.4.1.transformer_blocks.0.attn2', 6: 'input_blocks.5.1.transformer_blocks.0.attn1', 7: 'input_blocks.5.1.transformer_blocks.0.attn2', 8: 'input_blocks.7.1.transformer_blocks.0.attn1', 9: 'input_blocks.7.1.transformer_blocks.0.attn2', 10: 'input_blocks.8.1.transformer_blocks.0.attn1', 11: 'input_blocks.8.1.transformer_blocks.0.attn2', 12: 'output_blocks.3.1.transformer_blocks.0.attn1', 13: 'output_blocks.3.1.transformer_blocks.0.attn2', 14: 'output_blocks.4.1.transformer_blocks.0.attn1', 15: 'output_blocks.4.1.transformer_blocks.0.attn2', 16: 'output_blocks.5.1.transformer_blocks.0.attn1', 17: 'output_blocks.5.1.transformer_blocks.0.attn2', 18: 'output_blocks.6.1.transformer_blocks.0.attn1', 19: 'output_blocks.6.1.transformer_blocks.0.attn2', 20: 'output_blocks.7.1.transformer_blocks.0.attn1', 21: 'output_blocks.7.1.transformer_blocks.0.attn2', 22: 'output_blocks.8.1.transformer_blocks.0.attn1', 23: 'output_blocks.8.1.transformer_blocks.0.attn2', 24: 'output_blocks.9.1.transformer_blocks.0.attn1', 25: 'output_blocks.9.1.transformer_blocks.0.attn2', 26: 'output_blocks.10.1.transformer_blocks.0.attn1', 27: 'output_blocks.10.1.transformer_blocks.0.attn2', 28: 'output_blocks.11.1.transformer_blocks.0.attn1', 29: 'output_blocks.11.1.transformer_blocks.0.attn2', 30: 'middle_block.1.transformer_blocks.0.attn1', 31: 'middle_block.1.transformer_blocks.0.attn2'}
+module_mapping_sd15 = {
+    0: "input_blocks.1.1.transformer_blocks.0.attn1",
+    1: "input_blocks.1.1.transformer_blocks.0.attn2",
+    2: "input_blocks.2.1.transformer_blocks.0.attn1",
+    3: "input_blocks.2.1.transformer_blocks.0.attn2",
+    4: "input_blocks.4.1.transformer_blocks.0.attn1",
+    5: "input_blocks.4.1.transformer_blocks.0.attn2",
+    6: "input_blocks.5.1.transformer_blocks.0.attn1",
+    7: "input_blocks.5.1.transformer_blocks.0.attn2",
+    8: "input_blocks.7.1.transformer_blocks.0.attn1",
+    9: "input_blocks.7.1.transformer_blocks.0.attn2",
+    10: "input_blocks.8.1.transformer_blocks.0.attn1",
+    11: "input_blocks.8.1.transformer_blocks.0.attn2",
+    12: "output_blocks.3.1.transformer_blocks.0.attn1",
+    13: "output_blocks.3.1.transformer_blocks.0.attn2",
+    14: "output_blocks.4.1.transformer_blocks.0.attn1",
+    15: "output_blocks.4.1.transformer_blocks.0.attn2",
+    16: "output_blocks.5.1.transformer_blocks.0.attn1",
+    17: "output_blocks.5.1.transformer_blocks.0.attn2",
+    18: "output_blocks.6.1.transformer_blocks.0.attn1",
+    19: "output_blocks.6.1.transformer_blocks.0.attn2",
+    20: "output_blocks.7.1.transformer_blocks.0.attn1",
+    21: "output_blocks.7.1.transformer_blocks.0.attn2",
+    22: "output_blocks.8.1.transformer_blocks.0.attn1",
+    23: "output_blocks.8.1.transformer_blocks.0.attn2",
+    24: "output_blocks.9.1.transformer_blocks.0.attn1",
+    25: "output_blocks.9.1.transformer_blocks.0.attn2",
+    26: "output_blocks.10.1.transformer_blocks.0.attn1",
+    27: "output_blocks.10.1.transformer_blocks.0.attn2",
+    28: "output_blocks.11.1.transformer_blocks.0.attn1",
+    29: "output_blocks.11.1.transformer_blocks.0.attn2",
+    30: "middle_block.1.transformer_blocks.0.attn1",
+    31: "middle_block.1.transformer_blocks.0.attn2",
+}
 
 
 class LoRALinearLayer(torch.nn.Module):
@@ -34,69 +67,118 @@ class AttentionSharingUnit(torch.nn.Module):
         self.heads = module.heads
         self.frames = frames
         self.original_module = [module]
-        q_in_channels, q_out_channels = module.to_q.in_features, module.to_q.out_features
-        k_in_channels, k_out_channels = module.to_k.in_features, module.to_k.out_features
-        v_in_channels, v_out_channels = module.to_v.in_features, module.to_v.out_features
-        o_in_channels, o_out_channels = module.to_out[0].in_features, module.to_out[0].out_features
+        q_in_channels, q_out_channels = (
+            module.to_q.in_features,
+            module.to_q.out_features,
+        )
+        k_in_channels, k_out_channels = (
+            module.to_k.in_features,
+            module.to_k.out_features,
+        )
+        v_in_channels, v_out_channels = (
+            module.to_v.in_features,
+            module.to_v.out_features,
+        )
+        o_in_channels, o_out_channels = (
+            module.to_out[0].in_features,
+            module.to_out[0].out_features,
+        )
 
         hidden_size = k_out_channels
 
-        self.to_q_lora = [LoRALinearLayer(q_in_channels, q_out_channels, rank, module.to_q) for _ in range(self.frames)]
-        self.to_k_lora = [LoRALinearLayer(k_in_channels, k_out_channels, rank, module.to_k) for _ in range(self.frames)]
-        self.to_v_lora = [LoRALinearLayer(v_in_channels, v_out_channels, rank, module.to_v) for _ in range(self.frames)]
-        self.to_out_lora = [LoRALinearLayer(o_in_channels, o_out_channels, rank, module.to_out[0]) for _ in range(self.frames)]
+        self.to_q_lora = [
+            LoRALinearLayer(q_in_channels, q_out_channels, rank, module.to_q)
+            for _ in range(self.frames)
+        ]
+        self.to_k_lora = [
+            LoRALinearLayer(k_in_channels, k_out_channels, rank, module.to_k)
+            for _ in range(self.frames)
+        ]
+        self.to_v_lora = [
+            LoRALinearLayer(v_in_channels, v_out_channels, rank, module.to_v)
+            for _ in range(self.frames)
+        ]
+        self.to_out_lora = [
+            LoRALinearLayer(o_in_channels, o_out_channels, rank, module.to_out[0])
+            for _ in range(self.frames)
+        ]
 
         self.to_q_lora = torch.nn.ModuleList(self.to_q_lora)
         self.to_k_lora = torch.nn.ModuleList(self.to_k_lora)
         self.to_v_lora = torch.nn.ModuleList(self.to_v_lora)
         self.to_out_lora = torch.nn.ModuleList(self.to_out_lora)
 
-        self.temporal_i = torch.nn.Linear(in_features=hidden_size, out_features=hidden_size)
-        self.temporal_n = torch.nn.LayerNorm(hidden_size, elementwise_affine=True, eps=1e-6)
-        self.temporal_q = torch.nn.Linear(in_features=hidden_size, out_features=hidden_size)
-        self.temporal_k = torch.nn.Linear(in_features=hidden_size, out_features=hidden_size)
-        self.temporal_v = torch.nn.Linear(in_features=hidden_size, out_features=hidden_size)
-        self.temporal_o = torch.nn.Linear(in_features=hidden_size, out_features=hidden_size)
+        self.temporal_i = torch.nn.Linear(
+            in_features=hidden_size, out_features=hidden_size
+        )
+        self.temporal_n = torch.nn.LayerNorm(
+            hidden_size, elementwise_affine=True, eps=1e-6
+        )
+        self.temporal_q = torch.nn.Linear(
+            in_features=hidden_size, out_features=hidden_size
+        )
+        self.temporal_k = torch.nn.Linear(
+            in_features=hidden_size, out_features=hidden_size
+        )
+        self.temporal_v = torch.nn.Linear(
+            in_features=hidden_size, out_features=hidden_size
+        )
+        self.temporal_o = torch.nn.Linear(
+            in_features=hidden_size, out_features=hidden_size
+        )
 
         self.control_convs = None
 
         if use_control:
-            self.control_convs = [torch.nn.Sequential(
-                torch.nn.Conv2d(256, 256, kernel_size=3, padding=1, stride=1),
-                torch.nn.SiLU(),
-                torch.nn.Conv2d(256, hidden_size, kernel_size=1),
-            ) for _ in range(self.frames)]
+            self.control_convs = [
+                torch.nn.Sequential(
+                    torch.nn.Conv2d(256, 256, kernel_size=3, padding=1, stride=1),
+                    torch.nn.SiLU(),
+                    torch.nn.Conv2d(256, hidden_size, kernel_size=1),
+                )
+                for _ in range(self.frames)
+            ]
             self.control_convs = torch.nn.ModuleList(self.control_convs)
 
         self.control_signals = None
 
     def forward(self, h, context=None, value=None, transformer_options={}):
-        modified_hidden_states = einops.rearrange(h, '(b f) d c -> f b d c', f=self.frames)
+        modified_hidden_states = einops.rearrange(
+            h, "(b f) d c -> f b d c", f=self.frames
+        )
 
         if self.control_convs is not None:
             context_dim = int(modified_hidden_states.shape[2])
             control_outs = []
             for f in range(self.frames):
-                control_signal = self.control_signals[context_dim].to(modified_hidden_states)
+                control_signal = self.control_signals[context_dim].to(
+                    modified_hidden_states
+                )
                 control = self.control_convs[f](control_signal)
-                control = einops.rearrange(control, 'b c h w -> b (h w) c')
+                control = einops.rearrange(control, "b c h w -> b (h w) c")
                 control_outs.append(control)
             control_outs = torch.stack(control_outs, dim=0)
-            modified_hidden_states = modified_hidden_states + control_outs.to(modified_hidden_states)
+            modified_hidden_states = modified_hidden_states + control_outs.to(
+                modified_hidden_states
+            )
 
         if context is None:
             framed_context = modified_hidden_states
         else:
-            framed_context = einops.rearrange(context, '(b f) d c -> f b d c', f=self.frames)
+            framed_context = einops.rearrange(
+                context, "(b f) d c -> f b d c", f=self.frames
+            )
 
-        framed_cond_mark = einops.rearrange(transformer_options['cond_mark'], '(b f) -> f b', f=self.frames).to(modified_hidden_states)
+        framed_cond_mark = einops.rearrange(
+            transformer_options["cond_mark"], "(b f) -> f b", f=self.frames
+        ).to(modified_hidden_states)
 
         attn_outs = []
         for f in range(self.frames):
             fcf = framed_context[f]
 
             if context is not None:
-                cond_overwrite = transformer_options.get('cond_overwrite', [])
+                cond_overwrite = transformer_options.get("cond_overwrite", [])
                 if len(cond_overwrite) > f:
                     cond_overwrite = cond_overwrite[f]
                 else:
@@ -114,8 +196,12 @@ class AttentionSharingUnit(torch.nn.Module):
             attn_outs.append(o)
 
         attn_outs = torch.stack(attn_outs, dim=0)
-        modified_hidden_states = modified_hidden_states + attn_outs.to(modified_hidden_states)
-        modified_hidden_states = einops.rearrange(modified_hidden_states, 'f b d c -> (b f) d c', f=self.frames)
+        modified_hidden_states = modified_hidden_states + attn_outs.to(
+            modified_hidden_states
+        )
+        modified_hidden_states = einops.rearrange(
+            modified_hidden_states, "f b d c -> (b f) d c", f=self.frames
+        )
 
         x = modified_hidden_states
         x = self.temporal_n(x)
@@ -206,9 +292,11 @@ class AttentionSharingPatcher(torch.nn.Module):
         for i in range(32):
             real_key = module_mapping_sd15[i]
             attn_module = utils.get_attr(unet.model.diffusion_model, real_key)
-            u = AttentionSharingUnit(attn_module, frames=frames, use_control=use_control, rank=rank)
+            u = AttentionSharingUnit(
+                attn_module, frames=frames, use_control=use_control, rank=rank
+            )
             units.append(u)
-            unet.add_object_patch('diffusion_model.' + real_key, u)
+            unet.add_object_patch("diffusion_model." + real_key, u)
 
         self.hookers = HookerLayers(units)
 

@@ -1,15 +1,28 @@
 from typing import Any
-from torch import Tensor, float16, cat, flip, from_numpy, rot90, stack, median, device as Device, dtype as DType #type: ignore
+from torch import (
+    Tensor,
+    float16,
+    cat,
+    flip,
+    from_numpy,
+    rot90,
+    stack,
+    median,
+    device as Device,
+    dtype as DType,
+)  # type: ignore
 from tqdm import tqdm
 import refiners.fluxion.layers as fl
 from refiners.fluxion.context import Contexts
 from refiners.fluxion.layers import SelfAttention2d
-#from refiners.foundationals.latent_diffusion.auto_encoder import Resnet
-from utils.utils import checkerboard #type: ignore
+
+# from refiners.foundationals.latent_diffusion.auto_encoder import Resnet
+from utils.utils import checkerboard  # type: ignore
 import numpy as np
 
 
 import cv2
+
 
 def zero_module(module: fl.Module):
     """
@@ -46,6 +59,7 @@ class LatentTransparencyOffsetEncoderRefiners(fl.Chain):
             fl.Conv2d(256, 4, kernel_size=3, padding=1, stride=1),
         )
 
+
 class Resnet(fl.Sum):
     def __init__(
         self,
@@ -53,18 +67,29 @@ class Resnet(fl.Sum):
         out_channels: int,
         num_groups: int = 32,
         device: Device | str | None = None,
-        dtype: DType | None = None ,
+        dtype: DType | None = None,
     ):
         self.in_channels = in_channels
         self.out_channels = out_channels
         shortcut = (
-            fl.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1, device=device, dtype=dtype)
+            fl.Conv2d(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=1,
+                device=device,
+                dtype=dtype,
+            )
             if in_channels != out_channels
             else fl.Identity()
         )
         super().__init__(
             fl.Chain(
-                fl.GroupNorm(channels=in_channels, num_groups=num_groups, device=device, dtype=dtype),
+                fl.GroupNorm(
+                    channels=in_channels,
+                    num_groups=num_groups,
+                    device=device,
+                    dtype=dtype,
+                ),
                 fl.SiLU(),
                 fl.Conv2d(
                     in_channels=in_channels,
@@ -74,7 +99,12 @@ class Resnet(fl.Sum):
                     device=device,
                     dtype=dtype,
                 ),
-                fl.GroupNorm(channels=out_channels, num_groups=num_groups, device=device, dtype=dtype),
+                fl.GroupNorm(
+                    channels=out_channels,
+                    num_groups=num_groups,
+                    device=device,
+                    dtype=dtype,
+                ),
                 fl.SiLU(),
                 fl.Conv2d(
                     in_channels=out_channels,
@@ -87,6 +117,8 @@ class Resnet(fl.Sum):
             ),
             shortcut,
         )
+
+
 class DownBlock2D(fl.Chain):
     def __init__(
         self,
@@ -109,7 +141,9 @@ class DownBlock2D(fl.Chain):
                     device=device,
                     dtype=dtype,
                 ),
-                fl.SetContext("unet1024", "residuals", callback=lambda l, x: l.append(x)),
+                fl.SetContext(
+                    "unet1024", "residuals", callback=lambda l, x: l.append(x)
+                ),
             ),
             fl.Chain(
                 Resnet(
@@ -119,10 +153,18 @@ class DownBlock2D(fl.Chain):
                     device=device,
                     dtype=dtype,
                 ),
-                fl.SetContext("unet1024", "residuals", callback=lambda l, x: l.append(x)),
+                fl.SetContext(
+                    "unet1024", "residuals", callback=lambda l, x: l.append(x)
+                ),
             ),
             fl.Chain(
-                fl.Downsample(channels=self.out_channels, scale_factor=2, padding=1, device=device, dtype=dtype),
+                fl.Downsample(
+                    channels=self.out_channels,
+                    scale_factor=2,
+                    padding=1,
+                    device=device,
+                    dtype=dtype,
+                ),
             ),
         )
 
@@ -147,7 +189,9 @@ class AttnDownBlock2D(fl.Chain):
 
         super().__init__(
             fl.Chain(
-                fl.SetContext("unet1024", "residuals", callback=lambda l, x: l.append(x)),
+                fl.SetContext(
+                    "unet1024", "residuals", callback=lambda l, x: l.append(x)
+                ),
                 Resnet(
                     in_channels=self.in_channels,
                     num_groups=self.num_groups,
@@ -156,7 +200,9 @@ class AttnDownBlock2D(fl.Chain):
                     dtype=dtype,
                 ),
                 fl.Residual(
-                    fl.GroupNorm(channels=self.out_channels, num_groups=self.num_groups),
+                    fl.GroupNorm(
+                        channels=self.out_channels, num_groups=self.num_groups
+                    ),
                     SelfAttention2d(
                         channels=self.out_channels,
                         num_heads=self.out_channels // 8,
@@ -164,7 +210,9 @@ class AttnDownBlock2D(fl.Chain):
                         dtype=dtype,
                     ),
                 ),
-                fl.SetContext("unet1024", "residuals", callback=lambda l, x: l.append(x)),
+                fl.SetContext(
+                    "unet1024", "residuals", callback=lambda l, x: l.append(x)
+                ),
             ),
             fl.Chain(
                 Resnet(
@@ -175,7 +223,9 @@ class AttnDownBlock2D(fl.Chain):
                     dtype=dtype,
                 ),
                 fl.Residual(
-                    fl.GroupNorm(channels=self.out_channels, num_groups=self.num_groups),
+                    fl.GroupNorm(
+                        channels=self.out_channels, num_groups=self.num_groups
+                    ),
                     SelfAttention2d(
                         channels=self.out_channels,
                         num_heads=self.out_channels // 8,
@@ -183,7 +233,9 @@ class AttnDownBlock2D(fl.Chain):
                         dtype=dtype,
                     ),
                 ),
-                fl.SetContext("unet1024", "residuals", callback=lambda l, x: l.append(x)),
+                fl.SetContext(
+                    "unet1024", "residuals", callback=lambda l, x: l.append(x)
+                ),
             ),
             fl.Chain(
                 fl.Downsample(
@@ -231,7 +283,9 @@ class AttnUpBlock2D(fl.Chain):
                     dtype=dtype,
                 ),
                 fl.Residual(
-                    fl.GroupNorm(channels=self.out_channels, num_groups=self.num_groups),
+                    fl.GroupNorm(
+                        channels=self.out_channels, num_groups=self.num_groups
+                    ),
                     SelfAttention2d(
                         channels=self.out_channels,
                         num_heads=self.out_channels // 8,
@@ -256,7 +310,9 @@ class AttnUpBlock2D(fl.Chain):
                     dtype=dtype,
                 ),
                 fl.Residual(
-                    fl.GroupNorm(channels=self.out_channels, num_groups=self.num_groups),
+                    fl.GroupNorm(
+                        channels=self.out_channels, num_groups=self.num_groups
+                    ),
                     SelfAttention2d(
                         channels=self.out_channels,
                         num_heads=self.out_channels // 8,
@@ -281,7 +337,9 @@ class AttnUpBlock2D(fl.Chain):
                     dtype=dtype,
                 ),
                 fl.Residual(
-                    fl.GroupNorm(channels=self.out_channels, num_groups=self.num_groups),
+                    fl.GroupNorm(
+                        channels=self.out_channels, num_groups=self.num_groups
+                    ),
                     SelfAttention2d(
                         channels=self.out_channels,
                         num_heads=self.out_channels // 8,
@@ -416,7 +474,12 @@ class MiddleBlock(fl.Chain):
 
 # 1024 * 1024 * 3 -> 16 * 16 * 512 -> 1024 * 1024 * 3
 class UNet1024Refiners(fl.Chain):
-    def __init__(self, out_channels: int = 3, device: Device | str | None = "cuda", dtype: DType | None = None) -> None:
+    def __init__(
+        self,
+        out_channels: int = 3,
+        device: Device | str | None = "cuda",
+        dtype: DType | None = None,
+    ) -> None:
         self.out_channels = out_channels
         super().__init__(
             fl.Passthrough(
@@ -435,19 +498,90 @@ class UNet1024Refiners(fl.Chain):
             ),
             fl.Chain(
                 DownBlock2D(64, 128, num_groups=4, device=device, dtype=dtype),
-                AttnDownBlock2D(128, 256, num_groups=4, add_downsample=True, device=device, dtype=dtype),
-                AttnDownBlock2D(256, 512, num_groups=4, add_downsample=True, device=device, dtype=dtype),
-                AttnDownBlock2D(512, 512, num_groups=4, add_downsample=False, device=device, dtype=dtype),
+                AttnDownBlock2D(
+                    128,
+                    256,
+                    num_groups=4,
+                    add_downsample=True,
+                    device=device,
+                    dtype=dtype,
+                ),
+                AttnDownBlock2D(
+                    256,
+                    512,
+                    num_groups=4,
+                    add_downsample=True,
+                    device=device,
+                    dtype=dtype,
+                ),
+                AttnDownBlock2D(
+                    512,
+                    512,
+                    num_groups=4,
+                    add_downsample=False,
+                    device=device,
+                    dtype=dtype,
+                ),
             ),
             MiddleBlock(512, 512, num_groups=4, device=device, dtype=dtype),
             fl.Chain(
-                AttnUpBlock2D(512, 512, prev_out_channels=512, num_groups=4, device=device, dtype=dtype),
-                AttnUpBlock2D(256, 512, prev_out_channels=512, num_groups=4, device=device, dtype=dtype),
-                AttnUpBlock2D(128, 256, prev_out_channels=512, num_groups=4, device=device, dtype=dtype),
-                UpBlock2D(64, 128, prev_out_channels=256, num_groups=4, device=device, dtype=dtype),
-                UpBlock2D(32, 64, prev_out_channels=128, num_groups=4, device=device, dtype=dtype),
-                UpBlock2D(32, 32, prev_out_channels=64, num_groups=4, device=device, dtype=dtype),
-                UpBlock2D(32, 32, prev_out_channels=32, num_groups=4, add_upsample=False, device=device, dtype=dtype),
+                AttnUpBlock2D(
+                    512,
+                    512,
+                    prev_out_channels=512,
+                    num_groups=4,
+                    device=device,
+                    dtype=dtype,
+                ),
+                AttnUpBlock2D(
+                    256,
+                    512,
+                    prev_out_channels=512,
+                    num_groups=4,
+                    device=device,
+                    dtype=dtype,
+                ),
+                AttnUpBlock2D(
+                    128,
+                    256,
+                    prev_out_channels=512,
+                    num_groups=4,
+                    device=device,
+                    dtype=dtype,
+                ),
+                UpBlock2D(
+                    64,
+                    128,
+                    prev_out_channels=256,
+                    num_groups=4,
+                    device=device,
+                    dtype=dtype,
+                ),
+                UpBlock2D(
+                    32,
+                    64,
+                    prev_out_channels=128,
+                    num_groups=4,
+                    device=device,
+                    dtype=dtype,
+                ),
+                UpBlock2D(
+                    32,
+                    32,
+                    prev_out_channels=64,
+                    num_groups=4,
+                    device=device,
+                    dtype=dtype,
+                ),
+                UpBlock2D(
+                    32,
+                    32,
+                    prev_out_channels=32,
+                    num_groups=4,
+                    add_upsample=False,
+                    device=device,
+                    dtype=dtype,
+                ),
             ),
             fl.GroupNorm(channels=32, num_groups=4),
             fl.SiLU(),
@@ -474,28 +608,35 @@ class TransparentVAEDecoder:
         self.model = UNet1024Refiners(out_channels=4)
         self.model.load_from_safetensors(state_dict)
         self.model.to("cuda", float16)
-    
+
     def postprocess(self, y: Tensor) -> tuple[Tensor, Any]:
         y = y.clip(0, 1).movedim(1, -1)
         alpha = y[..., :1]
         fg = y[..., 1:]
 
         _, H, W, _ = fg.shape
-        cb = checkerboard(shape=(H // 64, W // 64)) #type: ignore
-        cb = cv2.resize(cb, (W, H), interpolation=cv2.INTER_NEAREST) #type: ignore
-        cb = (0.5 + (cb - 0.5) * 0.1)[None, ..., None]#type: ignore
-        cb = from_numpy(cb).to(fg) #type: ignore
+        cb = checkerboard(shape=(H // 64, W // 64))  # type: ignore
+        cb = cv2.resize(cb, (W, H), interpolation=cv2.INTER_NEAREST)  # type: ignore
+        cb = (0.5 + (cb - 0.5) * 0.1)[None, ..., None]  # type: ignore
+        cb = from_numpy(cb).to(fg)  # type: ignore
 
         vis = fg * alpha + cb * (1 - alpha)
 
         png = cat([fg, alpha], dim=3)[0]
         png = (png * 255.0).detach().cpu().float().numpy().clip(0, 255).astype(np.uint8)
 
-        return vis.movedim(-1,1), png
+        return vis.movedim(-1, 1), png
 
     def run(self, pixel: Tensor, latent: Tensor) -> tuple[Tensor, Any]:
         args = [
-            [False, 0], [False, 1], [False, 2], [False, 3], [True, 0], [True, 1], [True, 2], [True, 3],
+            [False, 0],
+            [False, 1],
+            [False, 2],
+            [False, 3],
+            [True, 0],
+            [True, 1],
+            [True, 2],
+            [True, 3],
         ]
 
         result: list[Tensor] = []
@@ -512,7 +653,7 @@ class TransparentVAEDecoder:
             feed_latent = rot90(feed_latent, k=rok, dims=(2, 3))
 
             self.model.set_context("unet1024", {"latent": feed_latent})
-            eps = self.model(feed_pixel).clip(0,1)
+            eps = self.model(feed_pixel).clip(0, 1)
             eps = rot90(eps, k=-rok, dims=(2, 3))
             if doflip:
                 eps = flip(eps, dims=(3,))
@@ -522,4 +663,3 @@ class TransparentVAEDecoder:
         stacked_result = stack(result, dim=0)
         _median = median(stacked_result, dim=0).values
         return self.postprocess(_median)
-

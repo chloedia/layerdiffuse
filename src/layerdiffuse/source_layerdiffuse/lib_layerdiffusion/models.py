@@ -94,8 +94,12 @@ class UNet1024(ModelMixin, ConfigMixin):
         super().__init__()
 
         # input
-        self.conv_in = nn.Conv2d(in_channels, block_out_channels[0], kernel_size=3, padding=(1, 1))
-        self.latent_conv_in = zero_module(nn.Conv2d(4, block_out_channels[2], kernel_size=1))
+        self.conv_in = nn.Conv2d(
+            in_channels, block_out_channels[0], kernel_size=3, padding=(1, 1)
+        )
+        self.latent_conv_in = zero_module(
+            nn.Conv2d(4, block_out_channels[2], kernel_size=1)
+        )
 
         self.down_blocks = nn.ModuleList([])
         self.mid_block = None
@@ -118,7 +122,9 @@ class UNet1024(ModelMixin, ConfigMixin):
                 resnet_eps=norm_eps,
                 resnet_act_fn=act_fn,
                 resnet_groups=norm_num_groups,
-                attention_head_dim=attention_head_dim if attention_head_dim is not None else output_channel,
+                attention_head_dim=attention_head_dim
+                if attention_head_dim is not None
+                else output_channel,
                 downsample_padding=downsample_padding,
                 resnet_time_scale_shift="default",
                 downsample_type=downsample_type,
@@ -135,7 +141,9 @@ class UNet1024(ModelMixin, ConfigMixin):
             resnet_act_fn=act_fn,
             output_scale_factor=mid_block_scale_factor,
             resnet_time_scale_shift="default",
-            attention_head_dim=attention_head_dim if attention_head_dim is not None else block_out_channels[-1],
+            attention_head_dim=attention_head_dim
+            if attention_head_dim is not None
+            else block_out_channels[-1],
             resnet_groups=norm_num_groups,
             attn_groups=None,
             add_attention=True,
@@ -147,7 +155,9 @@ class UNet1024(ModelMixin, ConfigMixin):
         for i, up_block_type in enumerate(up_block_types):
             prev_output_channel = output_channel
             output_channel = reversed_block_out_channels[i]
-            input_channel = reversed_block_out_channels[min(i + 1, len(block_out_channels) - 1)]
+            input_channel = reversed_block_out_channels[
+                min(i + 1, len(block_out_channels) - 1)
+            ]
 
             is_final_block = i == len(block_out_channels) - 1
 
@@ -162,7 +172,9 @@ class UNet1024(ModelMixin, ConfigMixin):
                 resnet_eps=norm_eps,
                 resnet_act_fn=act_fn,
                 resnet_groups=norm_num_groups,
-                attention_head_dim=attention_head_dim if attention_head_dim is not None else output_channel,
+                attention_head_dim=attention_head_dim
+                if attention_head_dim is not None
+                else output_channel,
                 resnet_time_scale_shift="default",
                 upsample_type=upsample_type,
                 dropout=dropout,
@@ -171,9 +183,13 @@ class UNet1024(ModelMixin, ConfigMixin):
             prev_output_channel = output_channel
 
         # out
-        self.conv_norm_out = nn.GroupNorm(num_channels=block_out_channels[0], num_groups=norm_num_groups, eps=norm_eps)
+        self.conv_norm_out = nn.GroupNorm(
+            num_channels=block_out_channels[0], num_groups=norm_num_groups, eps=norm_eps
+        )
         self.conv_act = nn.SiLU()
-        self.conv_out = nn.Conv2d(block_out_channels[0], out_channels, kernel_size=3, padding=1)
+        self.conv_out = nn.Conv2d(
+            block_out_channels[0], out_channels, kernel_size=3, padding=1
+        )
 
     def forward(self, x, latent):
         sample_latent = self.latent_conv_in(latent)
@@ -192,7 +208,9 @@ class UNet1024(ModelMixin, ConfigMixin):
 
         for upsample_block in self.up_blocks:
             res_samples = down_block_res_samples[-len(upsample_block.resnets) :]
-            down_block_res_samples = down_block_res_samples[: -len(upsample_block.resnets)]
+            down_block_res_samples = down_block_res_samples[
+                : -len(upsample_block.resnets)
+            ]
             sample = upsample_block(sample, res_samples, emb)
 
         sample = self.conv_norm_out(sample)
@@ -209,14 +227,20 @@ class TransparentVAEDecoder:
     def __init__(self, sd, mod_number=1):
         self.load_device = model_management.get_torch_device()
         self.offload_device = model_management.unet_offload_device()
-        self.dtype = torch.float16 if model_management.should_use_fp16(self.load_device) else torch.float32
+        self.dtype = (
+            torch.float16
+            if model_management.should_use_fp16(self.load_device)
+            else torch.float32
+        )
 
         model = UNet1024(in_channels=3, out_channels=4)
         model.load_state_dict(sd, strict=True)
         model.to(device=self.offload_device, dtype=self.dtype)
         model.eval()
 
-        self.model = ModelPatcher(model, load_device=self.load_device, offload_device=self.offload_device)
+        self.model = ModelPatcher(
+            model, load_device=self.load_device, offload_device=self.offload_device
+        )
         self.mod_number = mod_number
         return
 
@@ -266,11 +290,21 @@ class TransparentVAEDecoder:
     def patch(self, p, vae_patcher, output_origin):
         @torch.no_grad()
         def wrapper(func, latent):
-            pixel = func(latent).movedim(-1, 1).to(device=self.load_device, dtype=self.dtype)
+            pixel = (
+                func(latent)
+                .movedim(-1, 1)
+                .to(device=self.load_device, dtype=self.dtype)
+            )
 
             if output_origin:
                 origin_outputs = (
-                    (pixel.movedim(1, -1) * 255.0).detach().cpu().float().numpy().clip(0, 255).astype(np.uint8)
+                    (pixel.movedim(1, -1) * 255.0)
+                    .detach()
+                    .cpu()
+                    .float()
+                    .numpy()
+                    .clip(0, 255)
+                    .astype(np.uint8)
                 )
                 for png in origin_outputs:
                     p.extra_result_images.append(png)
@@ -300,7 +334,15 @@ class TransparentVAEDecoder:
                 vis_list.append(vis)
 
                 png = torch.cat([fg, alpha], dim=3)[0]
-                png = (png * 255.0).detach().cpu().float().numpy().clip(0, 255).astype(np.uint8)
+                png = (
+                    (png * 255.0)
+                    .detach()
+                    .cpu()
+                    .float()
+                    .numpy()
+                    .clip(0, 255)
+                    .astype(np.uint8)
+                )
                 p.extra_result_images.append(png)
 
             vis_list = torch.cat(vis_list, dim=0)
@@ -314,20 +356,28 @@ class TransparentVAEEncoder:
     def __init__(self, sd):
         self.load_device = model_management.get_torch_device()
         self.offload_device = model_management.unet_offload_device()
-        self.dtype = torch.float16 if model_management.should_use_fp16(self.load_device) else torch.float32
+        self.dtype = (
+            torch.float16
+            if model_management.should_use_fp16(self.load_device)
+            else torch.float32
+        )
 
         model = LatentTransparencyOffsetEncoder()
         model.load_state_dict(sd, strict=True)
         model.to(device=self.offload_device, dtype=self.dtype)
         model.eval()
 
-        self.model = ModelPatcher(model, load_device=self.load_device, offload_device=self.offload_device)
+        self.model = ModelPatcher(
+            model, load_device=self.load_device, offload_device=self.offload_device
+        )
         return
 
     def patch(self, p, vae_patcher):
         @torch.no_grad()
         def wrapper(func, latent):
-            print("VAE Encode with Latent Transparency Offset is under construction now.")
+            print(
+                "VAE Encode with Latent Transparency Offset is under construction now."
+            )
             print("This should not be important if denoising strength is high.")
             print("But this will influence results with low denoising strength.")
             print(

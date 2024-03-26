@@ -64,30 +64,48 @@ def crop_and_resize_image(detected_map, resize_mode, h, w):
 
     if resize_mode == ResizeMode.RESIZE_AND_FILL:
         k = min(k0, k1)
-        borders = np.concatenate([detected_map[0, :, :], detected_map[-1, :, :], detected_map[:, 0, :], detected_map[:, -1, :]], axis=0)
-        high_quality_border_color = np.median(borders, axis=0).astype(detected_map.dtype)
-        high_quality_background = np.tile(high_quality_border_color[None, None], [h, w, 1])
-        detected_map = high_quality_resize(detected_map, (safeint(old_w * k), safeint(old_h * k)))
+        borders = np.concatenate(
+            [
+                detected_map[0, :, :],
+                detected_map[-1, :, :],
+                detected_map[:, 0, :],
+                detected_map[:, -1, :],
+            ],
+            axis=0,
+        )
+        high_quality_border_color = np.median(borders, axis=0).astype(
+            detected_map.dtype
+        )
+        high_quality_background = np.tile(
+            high_quality_border_color[None, None], [h, w, 1]
+        )
+        detected_map = high_quality_resize(
+            detected_map, (safeint(old_w * k), safeint(old_h * k))
+        )
         new_h, new_w, _ = detected_map.shape
         pad_h = max(0, (h - new_h) // 2)
         pad_w = max(0, (w - new_w) // 2)
-        high_quality_background[pad_h:pad_h + new_h, pad_w:pad_w + new_w] = detected_map
+        high_quality_background[
+            pad_h : pad_h + new_h, pad_w : pad_w + new_w
+        ] = detected_map
         detected_map = high_quality_background
         detected_map = safe_numpy(detected_map)
         return detected_map
     else:
         k = max(k0, k1)
-        detected_map = high_quality_resize(detected_map, (safeint(old_w * k), safeint(old_h * k)))
+        detected_map = high_quality_resize(
+            detected_map, (safeint(old_w * k), safeint(old_h * k))
+        )
         new_h, new_w, _ = detected_map.shape
         pad_h = max(0, (new_h - h) // 2)
         pad_w = max(0, (new_w - w) // 2)
-        detected_map = detected_map[pad_h:pad_h+h, pad_w:pad_w+w]
+        detected_map = detected_map[pad_h : pad_h + h, pad_w : pad_w + w]
         detected_map = safe_numpy(detected_map)
         return detected_map
 
 
 def pytorch_to_numpy(x):
-    return [np.clip(255. * y.cpu().numpy(), 0, 255).astype(np.uint8) for y in x]
+    return [np.clip(255.0 * y.cpu().numpy(), 0, 255).astype(np.uint8) for y in x]
 
 
 def numpy_to_pytorch(x):
