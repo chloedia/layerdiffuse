@@ -1,23 +1,16 @@
 from typing import Any
+import torch
 from torch import (
     Tensor,
-    float16,
-    cat,
-    flip,
-    from_numpy,  # type: ignore
-    rot90,
-    stack,
-    median,
     device as Device,
     dtype as DType,
 )  # type: ignore
-from tqdm import tqdm
 import refiners.fluxion.layers as fl
 from refiners.fluxion.context import Contexts
 from refiners.fluxion.layers import SelfAttention2d
 
 # from refiners.foundationals.latent_diffusion.auto_encoder import Resnet
-from utils import checkerboard  # type: ignore
+from layerdiffuse.utils import checkerboard  # type: ignore
 import numpy as np
 
 
@@ -170,10 +163,6 @@ class DownBlock2D(fl.Chain):
             ),
         )
 
-    def monitor(self, x: Tensor) -> Tensor:
-        print("DownBlock Input : ", x.size())
-        return x
-
 
 class AttnDownBlock2D(fl.Chain):
     def __init__(
@@ -286,7 +275,10 @@ class AttnUpBlock2D(fl.Chain):
                 ),
                 fl.Residual(
                     fl.GroupNorm(
-                        channels=self.out_channels, num_groups=self.num_groups
+                        channels=self.out_channels,
+                        num_groups=self.num_groups,
+                        device=device,
+                        dtype=dtype,
                     ),
                     SelfAttention2d(
                         channels=self.out_channels,
@@ -343,7 +335,10 @@ class AttnUpBlock2D(fl.Chain):
                 ),
                 fl.Residual(
                     fl.GroupNorm(
-                        channels=self.out_channels, num_groups=self.num_groups
+                        channels=self.out_channels,
+                        num_groups=self.num_groups,
+                        device=device,
+                        dtype=dtype,
                     ),
                     SelfAttention2d(
                         channels=self.out_channels,
@@ -355,10 +350,6 @@ class AttnUpBlock2D(fl.Chain):
             ),
             fl.Upsample(channels=self.out_channels, device=device, dtype=dtype),
         )
-
-    def monitor(self, x: Tensor) -> Tensor:
-        print("x_up : ", x.size())
-        return x
 
 
 class UpBlock2D(fl.Chain):
@@ -433,10 +424,6 @@ class UpBlock2D(fl.Chain):
             else fl.Identity(),
         )
 
-    def monitor(self, x: Tensor) -> Tensor:
-        print("x_up2 : ", x.size())
-        return x
-
 
 class MiddleBlock(fl.Chain):
     def __init__(
@@ -459,7 +446,12 @@ class MiddleBlock(fl.Chain):
                 dtype=dtype,
             ),
             fl.Residual(
-                fl.GroupNorm(channels=self.out_channels, num_groups=self.num_groups),
+                fl.GroupNorm(
+                    channels=self.out_channels,
+                    num_groups=self.num_groups,
+                    device=device,
+                    dtype=dtype,
+                ),
                 SelfAttention2d(
                     channels=self.out_channels,
                     num_heads=self.out_channels // 8,
@@ -477,11 +469,10 @@ class MiddleBlock(fl.Chain):
         )
 
 
-# 1024 * 1024 * 3 -> 16 * 16 * 512 -> 1024 * 1024 * 3
-class UNet1024Refiners(fl.Chain):
+class TransparentDecoder(fl.Chain):
     def __init__(
         self,
-        out_channels: int = 3,
+        out_channels: int = 4,
         device: Device | str | None = "cuda",
         dtype: DType | None = None,
     ) -> None:
@@ -489,10 +480,10 @@ class UNet1024Refiners(fl.Chain):
         super().__init__(
             fl.Passthrough(
                 fl.UseContext("unet1024", "latent"),
-                fl.Conv2d(4, 64, kernel_size=1),
+                fl.Conv2d(4, 64, kernel_size=1, device=device, dtype=dtype),
                 fl.SetContext("unet1024", "latent_repr"),
             ),
-            fl.Conv2d(3, 32, kernel_size=3, padding=(1, 1)),
+            fl.Conv2d(3, 32, kernel_size=3, padding=(1, 1), device=device, dtype=dtype),
             fl.Sum(
                 fl.Chain(
                     DownBlock2D(32, 32, num_groups=4, device=device, dtype=dtype),
@@ -588,31 +579,23 @@ class UNet1024Refiners(fl.Chain):
                     dtype=dtype,
                 ),
             ),
-            fl.GroupNorm(channels=32, num_groups=4),
+            fl.GroupNorm(channels=32, num_groups=4, device=device, dtype=dtype),
             fl.SiLU(),
-            fl.Conv2d(32, self.out_channels, kernel_size=3, padding=1),
+            fl.Conv2d(
+                32,
+                self.out_channels,
+                kernel_size=3,
+                padding=1,
+                device=device,
+                dtype=dtype,
+            ),
         )
-
-    def monitor(self, x: Tensor) -> Tensor:
-        print("DownBlockOutput : ", x.size())
-        return x
-
-    def nextstep(self, x: Tensor) -> Tensor:
-        print("Finished a block")
-        return x
 
     def init_context(self) -> Contexts:
         return {
             "unet1024": {"residuals": []},
             "sampling": {"shapes": []},
         }
-
-
-class TransparentVAEDecoder:
-    def __init__(self, state_dict: str):
-        self.model = UNet1024Refiners(out_channels=4)
-        self.model.load_from_safetensors(state_dict)
-        self.model.to("cuda", float16)
 
     def postprocess(self, y: Tensor) -> tuple[Tensor, Any]:
         y = y.clip(0, 1).movedim(1, -1)
@@ -623,11 +606,11 @@ class TransparentVAEDecoder:
         cb = checkerboard(shape=(H // 64, W // 64))  # type: ignore
         cb = cv2.resize(cb, (W, H), interpolation=cv2.INTER_NEAREST)  # type: ignore
         cb = (0.5 + (cb - 0.5) * 0.1)[None, ..., None]  # type: ignore
-        cb = from_numpy(cb).to(fg)  # type: ignore
+        cb = torch.from_numpy(cb).to(fg)  # type: ignore
 
         vis = fg * alpha + cb * (1 - alpha)
 
-        png = cat([fg, alpha], dim=3)[0]
+        png = torch.cat([fg, alpha], dim=3)[0]
         png = (png * 255.0).detach().cpu().float().numpy().clip(0, 255).astype(np.uint8)
 
         return vis.movedim(-1, 1), png
@@ -646,25 +629,26 @@ class TransparentVAEDecoder:
 
         result: list[Tensor] = []
 
-        for doflip, rok in tqdm(args):
+        for doflip, rok in args:
             feed_pixel = pixel.clone()
             feed_latent = latent.clone()
 
             if doflip:
-                feed_pixel = flip(feed_pixel, dims=(3,))
-                feed_latent = flip(feed_latent, dims=(3,))
+                feed_pixel = torch.flip(feed_pixel, dims=(3,))
+                feed_latent = torch.flip(feed_latent, dims=(3,))
 
-            feed_pixel = rot90(feed_pixel, k=rok, dims=(2, 3))
-            feed_latent = rot90(feed_latent, k=rok, dims=(2, 3))
+            feed_pixel = torch.rot90(feed_pixel, k=rok, dims=(2, 3))
+            feed_latent = torch.rot90(feed_latent, k=rok, dims=(2, 3))
 
-            self.model.set_context("unet1024", {"latent": feed_latent})
-            eps = self.model(feed_pixel).clip(0, 1)
-            eps = rot90(eps, k=-rok, dims=(2, 3))
+            self.set_context("unet1024", {"latent": feed_latent})
+            eps = self(feed_pixel).clip(0, 1)
+            eps = torch.rot90(eps, k=-rok, dims=(2, 3))
             if doflip:
-                eps = flip(eps, dims=(3,))
+                eps = torch.flip(eps, dims=(3,))
 
             result += [eps]
 
-        stacked_result = stack(result, dim=0)
-        _median = median(stacked_result, dim=0).values
-        return self.postprocess(_median)
+        median = torch.median(
+            torch.stack(result, dim=0).to(torch.float32), dim=0
+        ).values
+        return self.postprocess(median.to(pixel.dtype))
