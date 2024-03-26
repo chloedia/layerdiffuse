@@ -4,7 +4,7 @@ from torch import (
     float16,
     cat,
     flip,
-    from_numpy,
+    from_numpy,  # type: ignore
     rot90,
     stack,
     median,
@@ -17,11 +17,16 @@ from refiners.fluxion.context import Contexts
 from refiners.fluxion.layers import SelfAttention2d
 
 # from refiners.foundationals.latent_diffusion.auto_encoder import Resnet
-from utils.utils import checkerboard  # type: ignore
+from utils import checkerboard  # type: ignore
 import numpy as np
 
 
 import cv2
+
+
+def append_residuals(residuals: list[Tensor], x: Tensor) -> None:
+    """Append residuals to a list. Used for SetContext callback."""
+    residuals.append(x)
 
 
 def zero_module(module: fl.Module):
@@ -131,8 +136,9 @@ class DownBlock2D(fl.Chain):
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.num_groups = num_groups
+
         super().__init__(
-            fl.SetContext("unet1024", "residuals", callback=lambda l, x: l.append(x)),
+            fl.SetContext("unet1024", "residuals", callback=append_residuals),
             fl.Chain(
                 Resnet(
                     in_channels=self.in_channels,
@@ -141,9 +147,7 @@ class DownBlock2D(fl.Chain):
                     device=device,
                     dtype=dtype,
                 ),
-                fl.SetContext(
-                    "unet1024", "residuals", callback=lambda l, x: l.append(x)
-                ),
+                fl.SetContext("unet1024", "residuals", callback=append_residuals),
             ),
             fl.Chain(
                 Resnet(
@@ -153,9 +157,7 @@ class DownBlock2D(fl.Chain):
                     device=device,
                     dtype=dtype,
                 ),
-                fl.SetContext(
-                    "unet1024", "residuals", callback=lambda l, x: l.append(x)
-                ),
+                fl.SetContext("unet1024", "residuals", callback=append_residuals),
             ),
             fl.Chain(
                 fl.Downsample(
@@ -189,9 +191,7 @@ class AttnDownBlock2D(fl.Chain):
 
         super().__init__(
             fl.Chain(
-                fl.SetContext(
-                    "unet1024", "residuals", callback=lambda l, x: l.append(x)
-                ),
+                fl.SetContext("unet1024", "residuals", callback=append_residuals),
                 Resnet(
                     in_channels=self.in_channels,
                     num_groups=self.num_groups,
@@ -201,7 +201,10 @@ class AttnDownBlock2D(fl.Chain):
                 ),
                 fl.Residual(
                     fl.GroupNorm(
-                        channels=self.out_channels, num_groups=self.num_groups
+                        channels=self.out_channels,
+                        num_groups=self.num_groups,
+                        device=device,
+                        dtype=dtype,
                     ),
                     SelfAttention2d(
                         channels=self.out_channels,
@@ -210,9 +213,7 @@ class AttnDownBlock2D(fl.Chain):
                         dtype=dtype,
                     ),
                 ),
-                fl.SetContext(
-                    "unet1024", "residuals", callback=lambda l, x: l.append(x)
-                ),
+                fl.SetContext("unet1024", "residuals", callback=append_residuals),
             ),
             fl.Chain(
                 Resnet(
@@ -224,7 +225,10 @@ class AttnDownBlock2D(fl.Chain):
                 ),
                 fl.Residual(
                     fl.GroupNorm(
-                        channels=self.out_channels, num_groups=self.num_groups
+                        channels=self.out_channels,
+                        num_groups=self.num_groups,
+                        device=device,
+                        dtype=dtype,
                     ),
                     SelfAttention2d(
                         channels=self.out_channels,
@@ -233,9 +237,7 @@ class AttnDownBlock2D(fl.Chain):
                         dtype=dtype,
                     ),
                 ),
-                fl.SetContext(
-                    "unet1024", "residuals", callback=lambda l, x: l.append(x)
-                ),
+                fl.SetContext("unet1024", "residuals", callback=append_residuals),
             ),
             fl.Chain(
                 fl.Downsample(
@@ -311,7 +313,10 @@ class AttnUpBlock2D(fl.Chain):
                 ),
                 fl.Residual(
                     fl.GroupNorm(
-                        channels=self.out_channels, num_groups=self.num_groups
+                        channels=self.out_channels,
+                        num_groups=self.num_groups,
+                        device=device,
+                        dtype=dtype,
                     ),
                     SelfAttention2d(
                         channels=self.out_channels,

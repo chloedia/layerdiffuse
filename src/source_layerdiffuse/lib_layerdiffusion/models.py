@@ -1,3 +1,4 @@
+# type: ignore
 import torch.nn as nn
 import torch
 import cv2
@@ -14,8 +15,8 @@ from layerdiffuse.source_layerdiffuse.lib_layerdiffusion.unet_2d_blocks import (
     get_down_block,
     get_up_block,
 )
-# import ldm_patched.modules.model_management as model_management
-# from ldm_patched.modules.model_patcher import ModelPatcher
+import ldm_patched.modules.model_management as model_management
+from ldm_patched.modules.model_patcher import ModelPatcher
 
 
 def zero_module(module):

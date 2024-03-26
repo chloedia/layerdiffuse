@@ -1,5 +1,4 @@
-# Currently only sd15
-
+# type: ignore
 import torch
 import einops
 

@@ -1,19 +1,17 @@
-import pytest
 import torch
 import torch.nn as nn
-from diffusers.models.attention_processor import Attention
-from diffusers.models.resnet import ResnetBlock2D
+import pytest
 
 import refiners.fluxion.layers as fl
 from refiners.fluxion.layers import SelfAttention2d
 from refiners.fluxion.model_converter import ModelConverter
 from refiners.fluxion.utils import norm
 from refiners.foundationals.latent_diffusion.auto_encoder import Resnet
-from refiners.foundationals.source_layerdiffuse.lib_layerdiffusion.unet_2d_blocks import (
-    get_down_block,
+
+from source_layerdiffuse.lib_layerdiffusion.unet_2d_blocks import (
     UNetMidBlock2D,
+    get_down_block,
 )
-from refiners.foundationals.layer_diffuse.models import AttnDownBlock2D
 
 
 @pytest.fixture(scope="module")
@@ -37,7 +35,7 @@ def attention_diffusers_fixture() -> nn.Module:
         num_layers=1,
         in_channels=128,
         out_channels=256,
-        temb_channels=None,
+        temb_channels=None,  # type: ignore
         add_downsample=False,
         resnet_eps=1e-5,
         resnet_act_fn="silu",
@@ -88,7 +86,7 @@ def res_diffusers_fixture() -> nn.Module:
         num_layers=1,
         in_channels=128,
         out_channels=256,
-        temb_channels=None,
+        temb_channels=None,  # type: ignore
         add_downsample=False,
         resnet_eps=1e-5,
         resnet_act_fn="silu",
@@ -134,7 +132,7 @@ def downsample_diffusers_fixture() -> nn.Module:
         num_layers=2,
         in_channels=128,
         out_channels=256,
-        temb_channels=None,
+        temb_channels=None,  # type: ignore
         add_downsample=True,
         resnet_eps=1e-5,
         resnet_act_fn="silu",
@@ -146,7 +144,7 @@ def downsample_diffusers_fixture() -> nn.Module:
         dropout=0.0,
     )
 
-    return model.downsamplers[0]
+    return model.downsamplers[0]  # type: ignore
 
 
 def test_downsample_layer(
@@ -210,7 +208,7 @@ def attn_down_block_diffuser() -> nn.Module:
         num_layers=2,
         in_channels=128,
         out_channels=256,
-        temb_channels=None,
+        temb_channels=None,  # type: ignore
         add_downsample=True,
         resnet_eps=1e-5,
         resnet_act_fn="silu",
@@ -273,7 +271,7 @@ def attn_middle_block_refiners() -> fl.Module:
 def attn_middle_block_diffuser() -> nn.Module:
     model = UNetMidBlock2D(
         in_channels=512,
-        temb_channels=None,
+        temb_channels=None,  # type: ignore
         resnet_act_fn="silu",
         resnet_time_scale_shift="default",
         attention_head_dim=8,

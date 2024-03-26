@@ -13,7 +13,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_xl import (
 )
 
 from layerdiffuse.models.models import TransparentVAEDecoder
-from utils.utils import load_frozen_patcher
+from utils import load_frozen_patcher
 
 from PIL import Image
 

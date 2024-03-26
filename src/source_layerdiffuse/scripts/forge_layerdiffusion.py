@@ -1,8 +1,7 @@
+# type: ignore
 import gradio as gr
 import os
 import functools
-import torch
-import numpy as np
 import copy
 
 from modules import scripts
@@ -10,9 +9,7 @@ from modules.processing import StableDiffusionProcessing
 from lib_layerdiffusion.enums import ResizeMode
 from lib_layerdiffusion.utils import (
     rgba2rgbfp32,
-    to255unit8,
     crop_and_resize_image,
-    forge_clip_encode,
 )
 from enum import Enum
 from modules.paths import models_path
@@ -21,8 +18,6 @@ from lib_layerdiffusion.models import TransparentVAEDecoder, TransparentVAEEncod
 from ldm_patched.modules.model_management import current_loaded_models
 from modules_forge.forge_sampler import sampling_prepare
 from modules.modelloader import load_file_from_url
-from lib_layerdiffusion.attention_sharing import AttentionSharingPatcher
-from ldm_patched.modules import model_management
 
 
 def is_model_loaded(model):
@@ -91,7 +86,7 @@ class LayerDiffusionForForge(scripts.Script):
 
             with gr.Row():
                 weight = gr.Slider(
-                    label=f"Weight", value=1.0, minimum=0.0, maximum=2.0, step=0.001
+                    label="Weight", value=1.0, minimum=0.0, maximum=2.0, step=0.001
                 )
                 ending_step = gr.Slider(
                     label="Stop At", value=1.0, minimum=0.0, maximum=1.0
@@ -290,7 +285,6 @@ class LayerDiffusionForForge(scripts.Script):
         B, C, H, W = kwargs["noise"].shape  # latent_shape
         height = H * 8
         width = W * 8
-        batch_size = p.batch_size
 
         method = LayerMethod(method)
         print(f"[Layer Diffusion] {method}")
@@ -315,7 +309,6 @@ class LayerDiffusionForForge(scripts.Script):
         original_unet = p.sd_model.forge_objects.unet.clone()
         unet = p.sd_model.forge_objects.unet.clone()
         vae = p.sd_model.forge_objects.vae.clone()
-        clip = p.sd_model.forge_objects.clip
 
         if method in [
             LayerMethod.FG_ONLY_ATTN,
@@ -362,10 +355,6 @@ class LayerDiffusionForForge(scripts.Script):
             else None
         )
 
-        fg_cond = forge_clip_encode(clip, fg_additional_prompt)
-        bg_cond = forge_clip_encode(clip, bg_additional_prompt)
-        blend_cond = forge_clip_encode(clip, blend_additional_prompt)
-
         if method == LayerMethod.FG_ONLY_ATTN:
             model_path = load_file_from_url(
                 url="https://huggingface.co/LayerDiffusion/layerdiffusion-v1/resolve/main/layer_xl_transparent_attn.safetensors",
@@ -391,7 +380,7 @@ class LayerDiffusionForForge(scripts.Script):
             for i in range(len(cond)):
                 try:
                     del cond[i]["model_conds"]["c_concat"]
-                except:
+                except KeyError:
                     pass
             return cond
 
