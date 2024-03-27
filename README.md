@@ -46,7 +46,8 @@ Go check into the refiners [docs](https://refine.rs/guides/adapting_sdxl/#multip
 ## What's Next ?
 
 > Add style aligned to the generated content, to align a batch to the same style with or without a ref image;
-> Add post processing for higher details quality (hands)
+
+> Add post processing for higher details quality (hands);
 
 Don't hesitate to contribute! 🔆
 
