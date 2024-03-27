@@ -6,19 +6,19 @@ import torch
 from torch import nn
 
 from refiners.fluxion.model_converter import ModelConverter
-from layerdiffuse.models.models import (
+from layerdiffuse.models import (
     LatentTransparencyOffsetEncoderRefiners,
-    UNet1024Refiners,
+    TransparentDecoder,
 )
-from layerdiffuse.source_layerdiffuse.lib_layerdiffusion.models import (
+from source_layerdiffuse.lib_layerdiffusion.models import (
     LatentTransparencyOffsetEncoder,
     UNet1024,
 )
-from utils.utils import load_torch_file  # type: ignore
+from layerdiffuse.utils import load_torch_file  # type: ignore
 
 
 def convert_unet1024(args: argparse.Namespace) -> None:
-    target = UNet1024Refiners(out_channels=4)
+    target = TransparentDecoder(out_channels=4)
     # low_cpu_mem_usage=False stops some annoying console messages us to `pip install accelerate`
     # source: nn.Module = UNet1024.from_pretrained(  # type: ignore
     #     pretrained_model_name_or_path=args.source_path_unet,
@@ -26,7 +26,7 @@ def convert_unet1024(args: argparse.Namespace) -> None:
     # )
     source: nn.Module = UNet1024(out_channels=4)
     source.load_state_dict(  # type: ignore
-        load_torch_file(args.source_path_unet)
+        load_torch_file(args.source_path_unet)  # type: ignore
     )
     assert isinstance(source, nn.Module), "Source model is not a nn.Module"
 
