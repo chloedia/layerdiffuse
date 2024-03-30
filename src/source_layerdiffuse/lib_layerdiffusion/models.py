@@ -10,13 +10,13 @@ from diffusers.configuration_utils import ConfigMixin, register_to_config
 from diffusers.models.modeling_utils import ModelMixin
 
 # from diffusers.models.unet_2d_blocks import UNetMidBlock2D, get_down_block, get_up_block
-from layerdiffuse.source_layerdiffuse.lib_layerdiffusion.unet_2d_blocks import (
+from source_layerdiffuse.lib_layerdiffusion.unet_2d_blocks import (
     UNetMidBlock2D,
     get_down_block,
     get_up_block,
 )
-import ldm_patched.modules.model_management as model_management
-from ldm_patched.modules.model_patcher import ModelPatcher
+# import ldm_patched.modules.model_management as model_management
+# from ldm_patched.modules.model_patcher import ModelPatcher
 
 
 def zero_module(module):
