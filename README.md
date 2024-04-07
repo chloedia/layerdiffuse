@@ -27,20 +27,16 @@ source .venv/bin/activate
 git clone https://github.com/finegrain-ai/refiners.git\
 cd refiners\
 rye sync --all-features\
-# Here I like using dynavision weights, but you can basically put any sdxl weights
-python scripts/conversion/convert_transformers_clip_text_model.py --from "nyxia/dynavision-xl" --subfolder2 text_encoder_2 --to text_encoder.safetensors --half\
-python scripts/conversion/convert_diffusers_unet.py --from "nyxia/dynavision-xl" --to sdxl-unet.safetensors --half\
-python scripts/conversion/convert_diffusers_autoencoder_kl.py --from "madebyollin/sdxl-vae-fp16-fix" --subfolder "" --to sdxl-lda.safetensors --half
-# Move the safetensors to your checkpoints directory
-# then you can delete the refiners directory
-cd .. \
-rm -rf refiners\
 ```
 > Install all the necessary weights files
 
 ```console
-curl -L "https://huggingface.co/LayerDiffusion/layerdiffusion-v1/resolve/main/layer_xl_transparent_attn.safetensors" --output "layer_xl_transparent_attn.safetensors"
+curl -L "https://huggingface.co/chloedia/layerdiffusion4refiners/blob/main/unet.safetensors" --output "checkpoints/unet.safetensors"
+curl -L "https://huggingface.co/chloedia/layerdiffusion4refiners/blob/main/text_encoder.safetensors" --output "checkpoints/text_encoder.safetensors"
+curl -L "https://huggingface.co/chloedia/layerdiffusion4refiners/blob/main/lda.safetensors" --output "checkpoints/lda.safetensors"
+
 curl -L "https://huggingface.co/chloedia/layerdiffusion4refiners/blob/main/vae_transparent_decoder.safetensors" --output "vae_transparent_decoder.safetensors"
+curl -L "https://huggingface.co/LayerDiffusion/layerdiffusion-v1/resolve/main/layer_xl_transparent_attn.safetensors" --output "layer_xl_transparent_attn.safetensors"
 ```
 
 And you are ready to go ! You can start by launching the generation of a cute panda wizard by simply running :
