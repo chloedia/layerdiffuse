@@ -14,7 +14,7 @@ from refiners.foundationals.latent_diffusion.stable_diffusion_xl import (
 )
 
 from layerdiffuse.models import TransparentDecoder
-from layerdiffuse.utils import load_frozen_patcher
+from layerdiffuse.utils import load_frozen_patcher, load_file_from_url
 
 from PIL import Image
 
@@ -35,17 +35,22 @@ def load_models(
     path: Path, /, device: torch.device, dtype: torch.dtype
 ) -> tuple[StableDiffusion_XL, TransparentDecoder]:
     assert path.exists(), f"Checkpoint path {path} does not exist"
-    checkpoints = [
-        "unet.safetensors",
-        "text_encoder.safetensors",
-        "lda.safetensors",
-        "vae_transparent_decoder.safetensors",
-        "layer_xl_transparent_attn.safetensors",
-    ]
+    checkpoints = {
+        "unet.safetensors": "https://huggingface.co/chloedia/layerdiffusion4refiners/blob/main/unet.safetensors",
+        "text_encoder.safetensors": "https://huggingface.co/chloedia/layerdiffusion4refiners/blob/main/text_encoder.safetensors",
+        "lda.safetensors": "https://huggingface.co/chloedia/layerdiffusion4refiners/blob/main/lda.safetensors",
+        "vae_transparent_decoder.safetensors": "https://huggingface.co/chloedia/layerdiffusion4refiners/blob/main/vae_transparent_decoder.safetensors",
+        "layer_xl_transparent_attn.safetensors": "https://huggingface.co/LayerDiffusion/layerdiffusion-v1/resolve/main/layer_xl_transparent_attn.safetensors",
+    }
     for checkpoint in checkpoints:
-        assert (
-            path / checkpoint
-        ).is_file(), f"Checkpoint {path / checkpoint} does not exist"
+        if not (path / checkpoint).is_file():
+            print(f"Checkpoint {path / checkpoint} does not exist")
+            print(f"Downloading {checkpoint} from Hugging Face ...")
+            load_file_from_url(
+                url=checkpoints[checkpoint],
+                model_dir=path,
+                file_name=checkpoint,
+            )
 
     sdxl = StableDiffusion_XL(device=device, dtype=dtype)
     sdxl.clip_text_encoder.load_from_safetensors(path / "text_encoder.safetensors")

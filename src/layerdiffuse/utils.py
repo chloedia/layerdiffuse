@@ -1,8 +1,11 @@
+from pathlib import Path
 import torch
 import safetensors
 from typing import Dict, Any
 
 import numpy as np
+import os
+from urllib.parse import urlparse
 
 
 def load_torch_file(ckpt, safe_load=False, device=None) -> dict:  # type: ignore
@@ -52,3 +55,26 @@ def load_frozen_patcher(state_dict: Dict[str, Any]) -> Dict[str, Any]:
             patch_flat[f"{model_key[:-7]}.down.weight"] = weight_list[0]
 
     return patch_flat
+
+
+def load_file_from_url(
+    url: str,
+    *,
+    model_dir: str | Path,
+    progress: bool = True,
+    file_name: str | None = None,
+) -> None:
+    """Download a file from `url` into `model_dir`, using the file present if possible.
+
+    Returns the path to the downloaded file.
+    """
+    os.makedirs(model_dir, exist_ok=True)
+    if not file_name:
+        parts = urlparse(url)
+        file_name = os.path.basename(parts.path)
+    cached_file = os.path.abspath(os.path.join(model_dir, file_name))
+    if not os.path.exists(cached_file):
+        print(f'Downloading: "{url}" to {cached_file}\n')
+        from torch.hub import download_url_to_file
+
+        download_url_to_file(url, cached_file, progress=progress)
