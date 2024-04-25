@@ -22,28 +22,13 @@ rye sync --all-features \
 source .venv/bin/activate
 ```
 
-> Install your sdxl weight files (see [refiners](https://github.com/finegrain-ai/refiners/tree/main) docs).
-```console
-git clone https://github.com/finegrain-ai/refiners.git\
-cd refiners\
-rye sync --all-features\
-```
-> Install all the necessary weights files
-
-```console
-curl -L "https://huggingface.co/chloedia/layerdiffusion4refiners/blob/main/unet.safetensors" --output "checkpoints/unet.safetensors"
-curl -L "https://huggingface.co/chloedia/layerdiffusion4refiners/blob/main/text_encoder.safetensors" --output "checkpoints/text_encoder.safetensors"
-curl -L "https://huggingface.co/chloedia/layerdiffusion4refiners/blob/main/lda.safetensors" --output "checkpoints/lda.safetensors"
-
-curl -L "https://huggingface.co/chloedia/layerdiffusion4refiners/blob/main/vae_transparent_decoder.safetensors" --output "vae_transparent_decoder.safetensors"
-curl -L "https://huggingface.co/LayerDiffusion/layerdiffusion-v1/resolve/main/layer_xl_transparent_attn.safetensors" --output "layer_xl_transparent_attn.safetensors"
-```
-
 And you are ready to go ! You can start by launching the generation of a cute panda wizard by simply running :
 
 ```console
 python3 src/layerdiffuse/inference.py --checkpoint_path "checkpoints/" --prompt "a futuristic magical panda with a purple glow, cyberpunk" --save_path "outputs/"
 ```
+**Note**: It should take time the first time as it will download all the necessary weight files. If you want to use different SDXL checkpoints you can use the refiners library to convert those file.
+> Install your own sdxl weight files using the convertion script of refiners (see [refiners](https://github.com/finegrain-ai/refiners/tree/main) docs).
 
 Go check into the refiners [docs](https://refine.rs/guides/adapting_sdxl/#multiple-loras) and especially the part to add loras or Adapters on top of the layer diffuse, create the assets for any of your creations that matches a specific style.
 
@@ -57,6 +42,7 @@ Go check into the refiners [docs](https://refine.rs/guides/adapting_sdxl/#multip
 > Add style aligned to the generated content, to align a batch to the same style with or without a ref image;
 
 > Add post processing for higher details quality (hands);
+
 
 Don't hesitate to contribute! 🔆
 
